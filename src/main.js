@@ -1,5 +1,5 @@
 import './style.css';
-import { loadState, saveState, createId, validateTransaction, validateCategory } from './store.js';
+import { loadState, saveState, createId, validateTransaction, validateCategory, validateBudget } from './store.js';
 import { renderApp } from './ui.js';
 
 const root = document.querySelector('#app');
@@ -9,15 +9,18 @@ let error = loaded.error;
 let activePage = 'overview';
 let notice = '';
 const filters = { search: '', type: 'all', month: 'all' };
+const now = new Date();
+const chartFilters = { month: String(now.getMonth() + 1), year: String(now.getFullYear()), type: 'expense' };
 let editor = null;
+const budgetFilters = { month: String(now.getMonth() + 1), year: String(now.getFullYear()) };
 
 function update() {
-  renderApp(root, state, activePage, error, { filters, editor, notice });
+  renderApp(root, state, activePage, error, { filters, chartFilters, budgetFilters, editor, notice });
 }
 function commit(mutator, message) {
-  const next = structuredClone(state);
-  mutator(next);
   try {
+    const next = structuredClone(state);
+    mutator(next);
     saveState(next);
     state = next;
     notice = message;
@@ -42,6 +45,13 @@ root.addEventListener('click', event => {
   if (kind === 'edit-transaction') editor = { kind: 'transaction', id };
   if (kind === 'new-category') editor = { kind: 'category', id: null };
   if (kind === 'edit-category') editor = { kind: 'category', id };
+  if (kind === 'new-budget') editor = { kind: 'budget', id: null };
+  if (kind === 'edit-budget') editor = { kind: 'budget', id };
+  if (kind === 'delete-budget') {
+    if (!window.confirm('Hapus anggaran ini?')) return;
+    commit(next => { next.budgets = next.budgets.filter(b => b.id !== id); }, 'Anggaran berhasil dihapus.');
+    return;
+  }
   if (kind === 'close-editor') editor = null;
   if (kind === 'delete-transaction') {
     if (!window.confirm('Hapus transaksi ini?')) return;
@@ -57,10 +67,13 @@ root.addEventListener('click', event => {
     return;
   }
   if (kind === 'calculator') {
-    const first = Number(document.querySelector('#calc-first')?.value);
-    const second = Number(document.querySelector('#calc-second')?.value);
+    const firstRaw = root.querySelector('#calc-first')?.value;
+    const secondRaw = root.querySelector('#calc-second')?.value;
+    const first = firstRaw?.trim() ? Number(firstRaw) : NaN;
+    const second = secondRaw?.trim() ? Number(secondRaw) : NaN;
     const op = document.querySelector('#calc-op')?.value;
-    const result = op === '+' ? first + second : op === '-' ? first - second : op === '*' ? first * second : second === 0 ? NaN : first / second;
+    const result = !Number.isFinite(first) || !Number.isFinite(second) ? NaN :
+      op === '+' ? first + second : op === '-' ? first - second : op === '*' ? first * second : op === '/' && second !== 0 ? first / second : NaN;
     const output = document.querySelector('#calc-result');
     if (output) output.textContent = Number.isFinite(result) ? `Hasil: ${result.toLocaleString('id-ID')}` : 'Operasi tidak valid (termasuk pembagian dengan nol).';
     const amount = document.querySelector('#transaction-amount');
@@ -70,17 +83,26 @@ root.addEventListener('click', event => {
   update();
 });
 root.addEventListener('input', event => {
-  if (event.target.matches('[data-filter]')) {
-    filters[event.target.dataset.filter] = event.target.value;
-    const focused = event.target.dataset.filter;
+  if (event.target.matches('[data-filter="search"]')) {
+    filters.search = event.target.value;
+    const focused = 'search';
     const cursor = event.target.selectionStart;
     update();
     const target = root.querySelector(`[data-filter="${focused}"]`);
     target?.focus();
-    if (target?.tagName === 'INPUT') target.setSelectionRange(cursor, cursor);
+    if (target?.type === 'search' && cursor !== null) target.setSelectionRange(cursor, cursor);
   }
 });
 root.addEventListener('change', event => {
+  if (event.target.matches('[data-budget-filter]')) {
+    budgetFilters[event.target.dataset.budgetFilter] = event.target.value;
+    editor = null; update(); return;
+  }
+  if (event.target.matches('[data-chart-filter]')) {
+    chartFilters[event.target.dataset.chartFilter] = event.target.value;
+    update();
+    return;
+  }
   if (event.target.matches('[data-filter]')) { filters[event.target.dataset.filter] = event.target.value; update(); }
   if (event.target.id === 'transaction-type') {
     const select = root.querySelector('#transaction-category');
@@ -99,6 +121,11 @@ root.addEventListener('submit', event => {
     const problem = validateTransaction(item, state.categories);
     if (problem) { form.querySelector('[data-form-error]').textContent = problem; return; }
     commit(next => { const i = next.transactions.findIndex(t => t.id === id); if (i < 0) next.transactions.push(item); else next.transactions[i] = item; }, id ? 'Transaksi diperbarui.' : 'Transaksi ditambahkan.');
+  } else if (form.dataset.form === 'budget') {
+    const item = { id: id || createId('budget'), categoryId: String(data.get('categoryId')), amount: Number(data.get('amount')), month: Number(data.get('month')), year: Number(data.get('year')) };
+    const problem = validateBudget(item, state.budgets, state.categories, id);
+    if (problem) { form.querySelector('[data-form-error]').textContent = problem; return; }
+    commit(next => { const i = next.budgets.findIndex(b => b.id === id); if (i < 0) next.budgets.push(item); else next.budgets[i] = item; }, id ? 'Anggaran diperbarui.' : 'Anggaran ditambahkan.');
   } else {
     const original = state.categories.find(c => c.id === id);
     const item = { id: id || createId('cat'), name: String(data.get('name') || '').trim(), type: data.get('type') };

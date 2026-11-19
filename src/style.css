@@ -102,3 +102,40 @@ body { overflow-x: hidden; }
 .notice:not(.error) { background:var(--color-primary-soft); padding:12px; border-radius:10px; }
 @media (min-width:768px) { .filter-grid { grid-template-columns:2fr 1fr 1fr; } .editor-panel form { grid-template-columns:repeat(2,minmax(0,1fr)); } .editor-panel .calculator,.editor-panel .toolbar,.editor-panel .form-error { grid-column:1/-1; } }
 @media (max-width:480px) { .record-manage,.category-row { align-items:flex-start; flex-direction:column; } .record-actions { justify-content:flex-start; } }
+
+/* Chart — native CSS bars, no charting dependencies */
+.chart-filters { margin-bottom:16px; }
+.chart-summary { display:grid; gap:12px; grid-template-columns:repeat(1,minmax(0,1fr)); margin-bottom:16px; }
+.chart-panel { margin-bottom:16px; }
+.chart-bar-row,.chart-category-row { margin-top:18px; }
+.chart-bar-header { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:14px; margin-bottom:8px; }
+.chart-bar-header strong,.chart-bar-header span { overflow-wrap:anywhere; }
+.chart-bar-track { height:16px; border-radius:99px; background:#eaf0ff; overflow:hidden; }
+.chart-bar-fill { height:100%; border-radius:99px; background:#2457d6; }
+.chart-bar-fill.income { background:#167347; }
+.chart-bar-fill.expense { background:#b42338; }
+.chart-bar-fill.purple { background:#7657c8; }
+@media (min-width:600px) { .chart-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+
+/* Budgeting — mobile-first */
+.budget-toolbar { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.budget-controls { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; flex:1 1 230px; }
+.budget-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
+.budget-heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:start; gap:8px; margin-bottom:16px; }
+.budget-heading .panel-title { margin:0; }
+.budget-detail { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:6px 0; font-variant-numeric:tabular-nums; }
+.budget-detail strong { text-align:right; overflow-wrap:anywhere; }
+.budget-negative { color:var(--color-danger); }
+.budget-progress-track { height:14px; background:#eaf0ff; border-radius:99px; overflow:hidden; margin-top:18px; }
+.budget-progress-fill { height:100%; border-radius:99px; }
+.budget-progress-fill.safe { background:#167347; }
+.budget-progress-fill.warning { background:#ad7600; }
+.budget-progress-fill.over { background:var(--color-danger); }
+.budget-status { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; font-size:13px; }
+.budget-status-label { font-weight:700; }
+.budget-status-label.safe { color:#167347; }
+.budget-status-label.warning { color:#875c00; }
+.budget-status-label.over { color:var(--color-danger); }
+.budget-editor form { display:grid; gap:12px; }
+@media (min-width:768px) { .budget-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .budget-editor form { grid-template-columns:repeat(2,minmax(0,1fr)); } .budget-editor .form-error,.budget-editor .toolbar { grid-column:1/-1; } }

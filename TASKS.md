@@ -151,3 +151,11 @@
 - [ ] `npm run build` berhasil.
 
 **Catatan:** Dokumen ini hanya rencana kerja/checklist. Belum mengimplementasikan kode aplikasi.
+
+## Catatan verifikasi Tahap 7 (19 November 2026)
+
+- Pengujian unit otomatis `node --test tests/store.test.js`: **5/5 lulus** untuk data awal, saldo, persistensi, JSON rusak, validasi record, dan anggaran.
+- Pemeriksaan sintaks `node --check` pada `src/main.js`, `src/store.js`, dan `src/ui.js`: **lulus**.
+- `npm run build`: **belum berhasil**, karena Vite tidak terpasang (`vite: not found`). Percobaan `npm install` mengalami timeout pada lingkungan ini.
+- **TM-18, TM-19, TM-20 tetap belum dicentang** karena pengujian browser end-to-end, aksesibilitas/kontras, responsivitas visual, dan build belum terverifikasi.
+- Checklist tugas sebelumnya juga tidak diubah karena belum seluruh acceptance criteria-nya diuji manual.

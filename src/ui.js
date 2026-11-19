@@ -1,4 +1,4 @@
-import { getTotals } from './store.js';
+import { getTotals, getBudgetUsage } from './store.js';
 
 const pages = [
   { id: 'overview', label: 'Overview', icon: 'home' },
@@ -102,6 +102,10 @@ export function renderApp(root, state, activePage = 'overview', error = null, vi
     main.append(recent);
   } else if (activePage === 'records') {
     renderRecords(main, state, view);
+  } else if (activePage === 'chart') {
+    renderChart(main, state, view);
+  } else if (activePage === 'budgeting') {
+    renderBudgeting(main, state, view);
   } else {
     const section = element('section', 'card placeholder');
     section.append(element('h2', '', `${pages.find(page => page.id === activePage).label} — tahap berikutnya`),
@@ -223,4 +227,144 @@ function renderEditor(main, state, editor) {
   footer.append(control('button',{type:'submit',class:'primary-button'},'Simpan'),button('Batal','close-editor',''));
   form.append(footer); card.append(form);
   main.insertBefore(card,main.querySelector('.records-panel'));
+}
+
+
+function renderChart(main, state, view) {
+  const current = new Date();
+  const filters = view.chartFilters || { month: String(current.getMonth() + 1), year: String(current.getFullYear()), type: 'expense' };
+  const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const filterCard = element('section', 'card chart-filters');
+  filterCard.append(element('h2', 'panel-title', 'Periode laporan'));
+  const controls = element('div', 'filter-grid');
+  const month = field('Bulan', 'month', 'select', { 'data-chart-filter': 'month' });
+  options(month.querySelector('select'), monthNames.map((name, index) => [String(index + 1), name]), filters.month);
+  const year = field('Tahun', 'year', 'select', { 'data-chart-filter': 'year' });
+  const years = new Set([current.getFullYear(), Number(filters.year)]);
+  for (const transaction of state.transactions) if (/^\d{4}-\d{2}-\d{2}$/.test(transaction.date)) years.add(Number(transaction.date.slice(0, 4)));
+  options(year.querySelector('select'), [...years].filter(Number.isInteger).sort((a,b) => b-a).map(y => [String(y), String(y)]), filters.year);
+  const type = field('Distribusi kategori', 'type', 'select', { 'data-chart-filter': 'type' });
+  options(type.querySelector('select'), [['expense', 'Pengeluaran'], ['income', 'Pemasukan']], filters.type);
+  controls.append(month, year, type);
+  filterCard.append(controls);
+  main.append(filterCard);
+
+  const period = `${filters.year}-${String(filters.month).padStart(2,'0')}`;
+  const items = state.transactions.filter(t => t.date.startsWith(`${period}-`));
+  const { income, expense } = getTotals(items);
+  const summary = element('section', 'chart-summary');
+  summary.setAttribute('aria-label', `Ringkasan ${monthNames[Number(filters.month)-1]} ${filters.year}`);
+  for (const [label, value, cls] of [['Pemasukan periode', income, 'income'], ['Pengeluaran periode', expense, 'expense']]) {
+    const card = element('article', `card ${cls}`);
+    card.append(element('p', 'card-label', label), element('p', 'card-value', rupiah(value)));
+    summary.append(card);
+  }
+  main.append(summary);
+
+  const comparison = element('section', 'card chart-panel');
+  comparison.append(element('h2', 'panel-title', 'Perbandingan pemasukan dan pengeluaran'));
+  const maximum = Math.max(income, expense);
+  if (maximum === 0) comparison.append(element('p', 'muted', 'Belum ada transaksi pada periode ini.'));
+  for (const [label, value, cls] of [['Pemasukan', income, 'income'], ['Pengeluaran', expense, 'expense']]) {
+    const row = element('div', 'chart-bar-row');
+    const header = element('div', 'chart-bar-header');
+    header.append(element('span', '', label), element('strong', '', rupiah(value)));
+    const track = element('div', 'chart-bar-track');
+    const bar = element('div', `chart-bar-fill ${cls}`);
+    bar.style.width = `${maximum ? value / maximum * 100 : 0}%`;
+    track.append(bar); row.append(header, track); comparison.append(row);
+  }
+  main.append(comparison);
+
+  const categoryCard = element('section', 'card chart-panel');
+  const typeLabel = filters.type === 'income' ? 'pemasukan' : 'pengeluaran';
+  categoryCard.append(element('h2', 'panel-title', `Distribusi ${typeLabel} per kategori`));
+  const categoryTotals = new Map();
+  for (const item of items.filter(t => t.type === filters.type)) categoryTotals.set(item.categoryId, (categoryTotals.get(item.categoryId) || 0) + item.amount);
+  const sorted = [...categoryTotals.entries()].sort((a,b) => b[1] - a[1]);
+  const total = sorted.reduce((sum, [, value]) => sum + value, 0);
+  if (!sorted.length) categoryCard.append(element('p', 'muted', `Belum ada ${typeLabel} pada periode ini.`));
+  for (const [id, value] of sorted) {
+    const name = state.categories.find(c => c.id === id)?.name || 'Kategori tidak tersedia';
+    const percent = total ? value / total * 100 : 0;
+    const row = element('div', 'chart-category-row');
+    const header = element('div', 'chart-bar-header');
+    header.append(element('strong', '', name), element('span', '', `${rupiah(value)} · ${percent.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`));
+    const track = element('div', 'chart-bar-track');
+    const bar = element('div', 'chart-bar-fill purple');
+    bar.style.width = `${percent}%`;
+    track.append(bar); row.append(header, track); categoryCard.append(row);
+  }
+  main.append(categoryCard);
+}
+
+
+function renderBudgeting(main, state, view) {
+  const now = new Date();
+  const filters = view.budgetFilters || { month: String(now.getMonth() + 1), year: String(now.getFullYear()) };
+  const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  if (view.notice) { const notice = element('p','notice',view.notice); notice.setAttribute('role','status'); main.append(notice); }
+  const toolbar = element('section','card budget-toolbar');
+  const controls = element('div','budget-controls');
+  const month = field('Bulan','month','select',{'data-budget-filter':'month'});
+  options(month.querySelector('select'),monthNames.map((name,i)=>[String(i+1),name]),filters.month);
+  const year = field('Tahun','year','select',{'data-budget-filter':'year'});
+  const years = new Set([now.getFullYear(),Number(filters.year),...state.budgets.map(b=>Number(b.year))]);
+  options(year.querySelector('select'),[...years].filter(Number.isInteger).sort((a,b)=>b-a).map(y=>[String(y),String(y)]),filters.year);
+  controls.append(month,year);
+  toolbar.append(controls,button('+ Tambah anggaran','new-budget','','primary-button'));
+  main.append(toolbar);
+  if (view.editor?.kind === 'budget') renderBudgetEditor(main,state,view.editor,filters,monthNames);
+  const budgets = state.budgets.filter(b=>Number(b.month)===Number(filters.month) && Number(b.year)===Number(filters.year));
+  if (!budgets.length) {
+    const empty = element('section','card empty-state');
+    empty.append(element('h2','panel-title','Belum ada anggaran'),element('p','muted','Buat anggaran untuk mengontrol pengeluaran bulanan.'),button('+ Tambah anggaran','new-budget','','primary-button'));
+    main.append(empty); return;
+  }
+  const grid = element('section','budget-grid');
+  grid.setAttribute('aria-label','Daftar anggaran bulanan');
+  for (const budget of budgets) {
+    const usage = getBudgetUsage(budget,state.transactions);
+    const card = element('article','card budget-card');
+    const heading = element('div','budget-heading');
+    heading.append(element('h2','panel-title',state.categories.find(c=>c.id===budget.categoryId)?.name || 'Kategori tidak tersedia'));
+    const actions = element('div','record-actions');
+    actions.append(button('Edit','edit-budget',budget.id),button('Hapus','delete-budget',budget.id,'danger-button'));
+    heading.append(actions);card.append(heading);
+    for (const [label,value] of [['Batas',budget.amount],['Terpakai',usage.spent],['Sisa',usage.remaining]]) {
+      const row = element('div','budget-detail');
+      row.append(element('span','muted',label),element('strong',value<0?'budget-negative':'',rupiah(value)));
+      card.append(row);
+    }
+    const track = element('div','budget-progress-track');
+    track.setAttribute('role','progressbar'); track.setAttribute('aria-label','Penggunaan anggaran');
+    track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');
+    track.setAttribute('aria-valuenow',String(Math.min(100,Math.max(0,usage.percent))));
+    track.setAttribute('aria-valuetext',`${usage.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari anggaran`);
+    const fill = element('div',`budget-progress-fill ${usage.percent>100?'over':usage.percent>=80?'warning':'safe'}`);
+    fill.style.width=`${Math.min(100,Math.max(0,usage.percent))}%`;
+    track.append(fill);card.append(track);
+    const status = element('div','budget-status');
+    status.append(element('strong','',`${usage.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%`),element('span',`budget-status-label ${usage.percent>100?'over':usage.percent>=80?'warning':'safe'}`,usage.status));
+    card.append(status);grid.append(card);
+  }
+  main.append(grid);
+}
+
+function renderBudgetEditor(main,state,editor,filters,monthNames) {
+  const existing = state.budgets.find(b=>b.id===editor.id);
+  const card = element('section','card editor-panel budget-editor');
+  card.append(element('h2','panel-title',`${existing?'Edit':'Tambah'} anggaran`));
+  const form = control('form',{'data-form':'budget'});
+  const category = field('Kategori pengeluaran','categoryId','select',{required:true});
+  options(category.querySelector('select'),state.categories.filter(c=>c.type==='expense').map(c=>[c.id,c.name]),existing?.categoryId);
+  if (!state.categories.some(c=>c.type==='expense')) form.append(element('p','form-error','Buat kategori pengeluaran terlebih dahulu di Records.'));
+  form.append(category,field('Batas anggaran (Rp)','amount','input',{type:'number',min:1,step:1,required:true,value:existing?.amount || ''}));
+  const month = field('Bulan','month','select',{required:true});
+  options(month.querySelector('select'),monthNames.map((name,i)=>[String(i+1),name]),String(existing?.month ?? filters.month));
+  form.append(month,field('Tahun','year','input',{type:'number',min:2000,max:2100,step:1,required:true,value:existing?.year ?? filters.year}));
+  form.append(control('p',{'data-form-error':'',class:'form-error',role:'alert'}));
+  const actions = element('div','toolbar');
+  actions.append(control('button',{type:'submit',class:'primary-button',...(state.categories.some(c=>c.type==='expense')?{}:{disabled:'disabled'})},'Simpan'),button('Batal','close-editor',''));
+  form.append(actions);card.append(form);main.append(card);
 }

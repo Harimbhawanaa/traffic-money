@@ -38,3 +38,27 @@ export function getTotals(transactions) {
   const expense = transactions.filter(item => item.type === 'expense').reduce((sum, item) => sum + item.amount, 0);
   return { income, expense, balance: income - expense };
 }
+
+export function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+export function createId(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+export function validateTransaction(data, categories) {
+  if (!['income', 'expense'].includes(data.type)) return 'Tipe transaksi tidak valid.';
+  if (!Number.isSafeInteger(data.amount) || data.amount <= 0) return 'Nominal harus berupa bilangan bulat positif.';
+  if (!categories.some(c => c.id === data.categoryId && c.type === data.type)) return 'Pilih kategori yang sesuai tipe transaksi.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date) || Number.isNaN(Date.parse(`${data.date}T00:00:00Z`)) || new Date(`${data.date}T00:00:00Z`).toISOString().slice(0,10) !== data.date) return 'Tanggal tidak valid.';
+  if (data.note.length > 200) return 'Catatan maksimal 200 karakter.';
+  return null;
+}
+
+export function validateCategory(data, categories, currentId = null) {
+  if (!['income', 'expense'].includes(data.type)) return 'Tipe kategori tidak valid.';
+  if (!data.name.trim() || data.name.trim().length > 40) return 'Nama kategori wajib diisi (maksimal 40 karakter).';
+  if (categories.some(c => c.id !== currentId && c.type === data.type && c.name.trim().toLocaleLowerCase('id') === data.name.trim().toLocaleLowerCase('id'))) return 'Nama kategori sudah digunakan pada tipe ini.';
+  return null;
+}

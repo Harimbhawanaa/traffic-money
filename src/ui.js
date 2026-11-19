@@ -1,4 +1,5 @@
 import { getTotals, getBudgetUsage } from './store.js';
+import { filterTransactions } from './filters.js';
 
 const pages = [
   { id: 'overview', label: 'Overview', icon: 'home' },
@@ -167,13 +168,9 @@ function renderRecords(main, state, view) {
   main.append(filterCard);
   const list = element('section', 'card records-panel');
   list.append(element('h2', 'panel-title', 'Riwayat transaksi'));
-  const q = filters.search.trim().toLocaleLowerCase('id');
-  const rows = state.transactions.map((item, i) => ({item, i})).filter(({item}) => {
-    const category = state.categories.find(c => c.id === item.categoryId)?.name || '';
-    return (filters.type === 'all' || item.type === filters.type) && (!filters.month || filters.month === 'all' || item.date.startsWith(filters.month)) && (!q || `${item.note} ${category}`.toLocaleLowerCase('id').includes(q));
-  }).sort((a,b) => b.item.date.localeCompare(a.item.date) || b.i - a.i);
+  const rows = filterTransactions(state.transactions, state.categories, filters);
   if (!rows.length) list.append(element('p','muted','Belum ada transaksi yang cocok.'));
-  for (const {item} of rows) {
+  for (const item of rows) {
     const row = element('div','record-row record-manage');
     const info = element('div','record-info');
     info.append(element('strong','',state.categories.find(c=>c.id===item.categoryId)?.name || 'Kategori tidak tersedia'), element('div','record-meta',`${item.date}${item.note ? ' · '+item.note : ''}`));

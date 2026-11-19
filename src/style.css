@@ -1,0 +1,38 @@
+:root {
+  font-family: Inter, Arial, Helvetica, sans-serif;
+  color: #17233c;
+  background: #f8faff;
+  font-synthesis: none;
+  line-height: 1.5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button { font: inherit; }
+button:focus-visible { outline: 3px solid #2457d6; outline-offset: 3px; }
+.app-shell { min-height: 100vh; }
+.app-header { display: flex; align-items: center; gap: 10px; padding: 20px 16px; max-width: 1200px; margin: auto; }
+.brand-mark { display: grid; place-items: center; background: #2457d6; color: white; border-radius: 12px; width: 36px; height: 36px; font-size: 23px; }
+.brand-name { font-size: 19px; }
+.main-content { max-width: 1200px; margin: auto; padding: 4px 16px 116px; }
+.page-title { font-size: 24px; margin: 8px 0 22px; }
+.summary-grid { display: grid; gap: 12px; }
+.card { background: #fff; border: 1px solid #dce4f1; border-radius: 16px; padding: 20px; min-width: 0; }
+.card-label { margin: 0 0 10px; color: #53627a; font-size: 14px; }
+.card-value { margin: 0; font-size: clamp(21px, 4vw, 30px); font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.balance { background: #eaf0ff; }
+.income .card-value, .amount-income { color: #167347; }
+.expense .card-value, .amount-expense { color: #b42338; }
+.recent { margin-top: 16px; }
+.recent h2 { font-size: 18px; margin: 0 0 16px; }
+.record-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid #dce4f1; padding: 14px 0; }
+.record-row small { display: block; }
+.record-row > span { font-weight: 650; text-align: right; }
+.muted { color: #53627a; }
+.notice.error { color: #b42338; background: #fcecef; border-radius: 12px; padding: 16px; }
+.placeholder { min-height: 220px; }
+.bottom-nav { position: fixed; z-index: 5; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, 620px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); border: 1px solid #dce4f1; border-bottom: 0; border-radius: 20px 20px 0 0; background: #fff; box-shadow: 0 -6px 24px #17233c10; }
+.nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; border: 0; border-radius: 12px; color: #53627a; background: transparent; cursor: pointer; font-size: 12px; }
+.nav-item.active { background: #eaf0ff; color: #2457d6; font-weight: 700; }
+.nav-icon { font-size: 24px; line-height: 1.2; }
+@media (min-width: 768px) { .app-header { padding: 24px; } .main-content { padding: 8px 24px 120px; } .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; } .page-title { font-size: 30px; } }
+@media (min-width: 1024px) { .app-header { padding: 28px 32px; } .main-content { padding-left: 32px; padding-right: 32px; } }

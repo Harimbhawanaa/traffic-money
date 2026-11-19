@@ -1,6 +1,7 @@
 import './style.css';
 import { loadState, saveState, createId, validateTransaction, validateCategory, validateBudget } from './store.js';
 import { renderApp } from './ui.js';
+import { commitState } from './commit.js';
 
 const root = document.querySelector('#app');
 const loaded = loadState();
@@ -18,18 +19,20 @@ function update() {
   renderApp(root, state, activePage, error, { filters, chartFilters, budgetFilters, editor, notice });
 }
 function commit(mutator, message) {
-  try {
-    const next = structuredClone(state);
-    mutator(next);
-    saveState(next);
-    state = next;
-    notice = message;
-    editor = null;
+  const result = commitState(state, mutator, saveState);
+  if (result.errorType) {
+    notice = result.errorType === 'validation'
+      ? 'Perubahan tidak valid; data sebelumnya tetap tersimpan.'
+      : result.errorType === 'storage'
+        ? 'Penyimpanan lokal gagal. Periksa kapasitas atau izin browser.'
+        : 'Perubahan gagal diproses. Data sebelumnya tetap tersimpan.';
     update();
-  } catch {
-    notice = 'Penyimpanan lokal gagal. Periksa kapasitas atau izin browser.';
-    update();
+    return;
   }
+  state = result.state;
+  notice = message;
+  editor = null;
+  update();
 }
 function today() {
   const d = new Date();

@@ -34,7 +34,15 @@ export function isStateShapeValid(value) {
       Number.isInteger(b.month) && b.month >= 1 && b.month <= 12 &&
       Number.isInteger(b.year) && b.year >= 2000 && b.year <= 2100 &&
       categoryMap.get(b.categoryId)?.type === 'expense')) return false;
-  return new Set(budgets.map(b => `${b.categoryId}:${b.year}:${b.month}`)).size === budgets.length;
+  if (new Set(budgets.map(b => `${b.categoryId}:${b.year}:${b.month}`)).size !== budgets.length) return false;
+  try {
+    getTotals(transactions);
+    for (const budget of budgets) getBudgetUsage(budget, transactions);
+  } catch (error) {
+    if (error instanceof RangeError) return false;
+    throw error;
+  }
+  return true;
 }
 
 /** Jangan menimpa data tersimpan yang gagal dibaca atau tidak valid. */
@@ -54,10 +62,19 @@ export function loadState() {
   }
 }
 
+export function safeSum(values) {
+  return values.reduce((sum, value) => {
+    if (!Number.isSafeInteger(value) || !Number.isSafeInteger(sum + value)) throw new RangeError('Total nominal melebihi batas bilangan bulat aman.');
+    return sum + value;
+  }, 0);
+}
+
 export function getTotals(transactions) {
-  const income = transactions.filter(item => item.type === 'income').reduce((sum, item) => sum + item.amount, 0);
-  const expense = transactions.filter(item => item.type === 'expense').reduce((sum, item) => sum + item.amount, 0);
-  return { income, expense, balance: income - expense };
+  const income = safeSum(transactions.filter(item => item.type === 'income').map(item => item.amount));
+  const expense = safeSum(transactions.filter(item => item.type === 'expense').map(item => item.amount));
+  const balance = income - expense;
+  if (!Number.isSafeInteger(balance)) throw new RangeError('Saldo melebihi batas bilangan bulat aman.');
+  return { income, expense, balance };
 }
 
 export function saveState(state) {
@@ -70,17 +87,20 @@ export function createId(prefix) {
 }
 
 export function validateTransaction(data, categories) {
+  if (!data || typeof data !== 'object' || !Array.isArray(categories)) return 'Data transaksi tidak valid.';
   if (!['income', 'expense'].includes(data.type)) return 'Tipe transaksi tidak valid.';
   if (!Number.isSafeInteger(data.amount) || data.amount <= 0) return 'Nominal harus berupa bilangan bulat positif.';
   if (!categories.some(c => c.id === data.categoryId && c.type === data.type)) return 'Pilih kategori yang sesuai tipe transaksi.';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date) || Number.isNaN(Date.parse(`${data.date}T00:00:00Z`)) || new Date(`${data.date}T00:00:00Z`).toISOString().slice(0,10) !== data.date) return 'Tanggal tidak valid.';
+  if (typeof data.note !== 'string') return 'Catatan harus berupa teks.';
   if (data.note.length > 200) return 'Catatan maksimal 200 karakter.';
   return null;
 }
 
 export function validateCategory(data, categories, currentId = null) {
+  if (!data || typeof data !== 'object' || !Array.isArray(categories)) return 'Data kategori tidak valid.';
   if (!['income', 'expense'].includes(data.type)) return 'Tipe kategori tidak valid.';
-  if (!data.name.trim() || data.name.trim().length > 40) return 'Nama kategori wajib diisi (maksimal 40 karakter).';
+  if (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 40) return 'Nama kategori wajib diisi (maksimal 40 karakter).';
   if (categories.some(c => c.id !== currentId && c.type === data.type && c.name.trim().toLocaleLowerCase('id') === data.name.trim().toLocaleLowerCase('id'))) return 'Nama kategori sudah digunakan pada tipe ini.';
   return null;
 }
@@ -97,8 +117,9 @@ export function validateBudget(item, budgets, categories, currentId = null) {
 
 export function getBudgetUsage(budget, transactions) {
   const period = `${budget.year}-${String(budget.month).padStart(2, '0')}-`;
-  const spent = transactions.filter(t => t.type === 'expense' && t.categoryId === budget.categoryId && t.date.startsWith(period)).reduce((sum, t) => sum + t.amount, 0);
+  const spent = safeSum(transactions.filter(t => t.type === 'expense' && t.categoryId === budget.categoryId && t.date.startsWith(period)).map(t => t.amount));
   const remaining = budget.amount - spent;
+  if (!Number.isSafeInteger(remaining)) throw new RangeError('Sisa anggaran melebihi batas bilangan bulat aman.');
   const percent = spent / budget.amount * 100;
   return { spent, remaining, percent, status: percent > 100 ? 'Melebihi anggaran' : percent >= 80 ? 'Mendekati batas' : 'Aman' };
 }

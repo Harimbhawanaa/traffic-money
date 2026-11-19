@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createExampleState,validateTransaction,validateCategory,getTotals,getBudgetUsage,isStateShapeValid} from '../src/store.js';
+import {commitState} from '../src/commit.js';
+const state=createExampleState(), cat=state.categories[0];
+const tx={type:cat.type,categoryId:cat.id,amount:100,date:'2026-11-19',note:''};
+test('null note returns validation error',()=>assert.equal(typeof validateTransaction({...tx,note:null},state.categories),'string'));
+test('null category name returns validation error',()=>assert.equal(typeof validateCategory({type:'expense',name:null},state.categories),'string'));
+test('malformed transaction returns validation error',()=>assert.equal(typeof validateTransaction(null,state.categories),'string'));
+test('unsafe income accumulation rejected',()=>assert.throws(()=>getTotals([{type:'income',amount:Number.MAX_SAFE_INTEGER},{type:'income',amount:2}]),RangeError));
+test('unsafe budget accumulation rejected',()=>assert.throws(()=>getBudgetUsage({amount:100,year:2026,month:11,categoryId:'c'},[{type:'expense',categoryId:'c',date:'2026-11-01',amount:Number.MAX_SAFE_INTEGER},{type:'expense',categoryId:'c',date:'2026-11-02',amount:2}]),RangeError));
+test('normal totals unchanged',()=>assert.equal(getTotals([{type:'income',amount:200},{type:'expense',amount:80}]).balance,120));
+test('unsafe aggregate state rejected before save',()=>{const s=createExampleState();const c=s.categories.find(x=>x.type==='income');s.transactions=[{id:'a',type:'income',amount:Number.MAX_SAFE_INTEGER,categoryId:c.id,date:'2026-11-01',note:''},{id:'b',type:'income',amount:2,categoryId:c.id,date:'2026-11-02',note:''}];assert.equal(isStateShapeValid(s),false)});
+test('storage error preserves state',()=>{const result=commitState(state,()=>{},()=>{throw Error('quota')});assert.equal(result.state,state);assert.equal(result.errorType,'storage')});
+test('validation error preserves state',()=>{const result=commitState(state,s=>{s.transactions[0].amount=0},()=>{});assert.equal(result.state,state);assert.equal(result.errorType,'validation')});
+test('successful commit changes state only after save',()=>{let saved=false;const result=commitState(state,s=>{s.transactions[0].amount=200},()=>{saved=true});assert.equal(saved,true);assert.notEqual(result.state,state);assert.equal(result.errorType,null)});
